@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Neokloud – Linux Command Operators Quiz</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+
+    .quiz-container {
+      background: #020617;
+      border-radius: 16px;
+      padding: 24px 24px 32px;
+      width: 100%;
+      max-width: 720px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      border: 1px solid #1f2937;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 18px;
+      color: #38bdf8;
+    }
+
+    .badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #bae6fd;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+
+    .progress-wrapper {
+      margin-bottom: 20px;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #111827;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #38bdf8, #6366f1);
+      transition: width 0.3s ease;
+    }
+
+    .question-code {
+      background: #020617;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+        Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      border: 1px solid #1f2937;
+      color: #e5e7eb;
+      margin-bottom: 12px;
+      overflow-x: auto;
+    }
+
+    .question-text {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: #f9fafb;
+    }
+
+    .options {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .option-btn {
+      text-align: left;
+      font-size: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      color: #e5e7eb;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .option-btn span.key {
+      font-weight: 700;
+      margin-right: 6px;
+      color: #9ca3af;
+    }
+
+    .option-btn:hover {
+      border-color: #4b5563;
+      background: #020617;
+      transform: translateY(-1px);
+    }
+
+    .option-btn.selected {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .option-btn.correct {
+      border-color: #22c55e;
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .option-btn.incorrect {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.12);
+    }
+
+    .explanation {
+      font-size: 13px;
+      background: #020617;
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid #1f2937;
+      color: #d1d5db;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status {
+      font-size: 13px;
+      color: #9ca3af;
+    }
+
+    .primary-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(90deg, #38bdf8, #6366f1);
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.15s ease, transform 0.1s ease;
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary-btn:not(:disabled):hover {
+      transform: translateY(-1px);
+    }
+
+    .primary-btn.small {
+      padding: 6px 14px;
+      font-size: 13px;
+    }
+
+    .result {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 15px;
+    }
+
+    @media (max-width: 600px) {
+      .quiz-container {
+        margin: 12px;
+        padding: 18px 16px 24px;
+      }
+
+      .question-code {
+        font-size: 12px;
+      }
+
+      .question-text {
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="quiz-container">
+    <div class="header">
+      <div class="brand">Neokloud Quiz</div>
+      <div class="badge">Linux | Pipes &amp; Operators</div>
+    </div>
+
+    <div class="progress-wrapper">
+      <div class="progress-label">
+        <span id="questionCounter">Question 1 of 4</span>
+        <span id="scoreLabel">Score: 0</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <pre class="question-code" id="questionCode"></pre>
+
+    <div class="question-text" id="questionText"></div>
+
+    <div class="options" id="optionsContainer"></div>
+
+    <div class="explanation" id="explanationBox"></div>
+
+    <div class="footer">
+      <div class="status" id="statusText">Select an option to check your answer.</div>
+      <button class="primary-btn" id="nextBtn" disabled>
+        Next
+        <span>⮕</span>
+      </button>
+    </div>
+
+    <div class="result" id="resultBox"></div>
+  </div>
+
+  <script>
+    const questions = [
+      {
+        code: "commandA | commandB",
+        text:
+          "What is the primary function of the | (pipe) operator in this command?",
+        options: [
+          "Runs commandB only if commandA exits with status 0.",
+          "Runs commandA and then commandB, one after another, no relation.",
+          "Sends the stdout of commandA into the stdin of commandB.",
+          "Runs commandB only if commandA fails."
+        ],
+        correctIndex: 2,
+        explanation:
+          "The pipe (|) connects the standard output (stdout) of commandA to the standard input (stdin) of commandB."
+      },
+      {
+        code: "command1 && command2",
+        text:
+          "What does the && operator guarantee about command2?",
+        options: [
+          "command2 always runs, no matter what command1 returns.",
+          "command2 runs only if command1 succeeds (exit code 0).",
+          "command2 runs only if command1 fails (exit code ≠ 0).",
+          "command2 receives stdout of command1 as stdin."
+        ],
+        correctIndex: 1,
+        explanation:
+          "With &&, command2 runs only if command1 finished successfully (exit status 0). It is commonly used for 'run this, and if it works, then run that'."
+      },
+      {
+        code: "command1 || command2",
+        text:
+          "When will command2 be executed in this expression?",
+        options: [
+          "Always, after command1.",
+          "Only if command1 succeeds.",
+          "Only if command1 fails (non-zero exit code).",
+          "Only if both command1 and command2 are background jobs."
+        ],
+        correctIndex: 2,
+        explanation:
+          "With ||, command2 is a fallback: it runs only if command1 fails (exit code is non-zero)."
+      },
+      {
+        code: "grep 'error' app.log | wc -l && echo \"Errors found\" || echo \"No errors\"",
+        text:
+          "Which statement best describes this combined command?",
+        options: [
+          "It only prints \"Errors found\" and never prints \"No errors\".",
+          "It pipes grep into wc -l, then echoes based purely on grep's output text.",
+          "It counts matching lines; if count command succeeds, prints \"Errors found\", otherwise \"No errors\".",
+          "It is invalid because && and || cannot be used together."
+        ],
+        correctIndex: 2,
+        explanation:
+          "The pipeline grep | wc -l runs first. If that pipeline exits successfully, && causes \"Errors found\" to echo; if it fails, || causes \"No errors\" to echo. This is a typical pattern for success/failure messaging."
+      }
+    ];
+
+    let currentIndex = 0;
+    let score = 0;
+    let selectedIndex = null;
+    let questionLocked = false;
+
+    const questionCode = document.getElementById("questionCode");
+    const questionText = document.getElementById("questionText");
+    const optionsContainer = document.getElementById("optionsContainer");
+    const explanationBox = document.getElementById("explanationBox");
+    const statusText = document.getElementById("statusText");
+    const nextBtn = document.getElementById("nextBtn");
+    const resultBox = document.getElementById("resultBox");
+    const questionCounter = document.getElementById("questionCounter");
+    const scoreLabel = document.getElementById("scoreLabel");
+    const progressFill = document.getElementById("progressFill");
+
+    function renderQuestion() {
+      const q = questions[currentIndex];
+
+      questionCode.textContent = q.code;
+      questionText.textContent = q.text;
+      optionsContainer.innerHTML = "";
+      explanationBox.style.display = "none";
+      explanationBox.textContent = "";
+      statusText.textContent = "Select an option to check your answer.";
+      nextBtn.disabled = true;
+      resultBox.textContent = "";
+      selectedIndex = null;
+      questionLocked = false;
+
+      // Progress and labels
+      questionCounter.textContent = `Question ${currentIndex + 1} of ${
+        questions.length
+      }`;
+      scoreLabel.textContent = `Score: ${score}`;
+      const progressPercent = ((currentIndex) / questions.length) * 100;
+      progressFill.style.width = progressPercent + "%";
+
+      q.options.forEach((opt, index) => {
+        const btn = document.createElement("button");
+        btn.className = "option-btn";
+        btn.innerHTML = `<span class="key">${
+          String.fromCharCode(65 + index)
+        }.</span> ${opt}`;
+        btn.addEventListener("click", () => handleOptionClick(index, btn));
+        optionsContainer.appendChild(btn);
+      });
+
+      // Change button text on last question
+      nextBtn.textContent =
+        currentIndex === questions.length - 1
+          ? "Finish ⮕"
+          : "Next ⮕";
+    }
+
+    function handleOptionClick(index, btnElement) {
+      if (questionLocked) return;
+
+      selectedIndex = index;
+      const q = questions[currentIndex];
+      const optionButtons = document.querySelectorAll(".option-btn");
+
+      optionButtons.forEach((btn) => btn.classList.remove("selected"));
+      btnElement.classList.add("selected");
+
+      // Lock question on first selection
+      questionLocked = true;
+
+      optionButtons.forEach((btn, i) => {
+        if (i === q.correctIndex) {
+          btn.classList.add("correct");
+        }
+        if (i === selectedIndex && i !== q.correctIndex) {
+          btn.classList.add("incorrect");
+        }
+      });
+
+      if (selectedIndex === q.correctIndex) {
+        score++;
+        statusText.textContent = "✅ Correct!";
+      } else {
+        statusText.textContent = "❌ Incorrect. Check the explanation below.";
+      }
+
+      scoreLabel.textContent = `Score: ${score}`;
+
+      explanationBox.style.display = "block";
+      explanationBox.textContent = q.explanation;
+
+      nextBtn.disabled = false;
+    }
+
+    nextBtn.addEventListener("click", () => {
+      if (currentIndex < questions.length - 1) {
+        currentIndex++;
+        renderQuestion();
+      } else {
+        showFinalResult();
+      }
+    });
+
+    function showFinalResult() {
+      questionCode.style.display = "none";
+      questionText.textContent = "Quiz complete!";
+      optionsContainer.innerHTML = "";
+      explanationBox.style.display = "none";
+      statusText.textContent = "You have reached the end of the quiz.";
+      nextBtn.disabled = true;
+
+      const percentage = Math.round((score / questions.length) * 100);
+      progressFill.style.width = "100%";
+
+      resultBox.innerHTML = `
+        <strong>Your final score:</strong> ${score} / ${
+        questions.length
+      } (${percentage}%)<br/>
+        Refresh the page to try again.
+      `;
+    }
+
+    // Initial render
+    renderQuestion();
+  </script>
+</body>
+</html>
