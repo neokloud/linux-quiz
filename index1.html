@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permission Commander - chmod Visualizer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .shake-error {
+            animation: shake 0.5s ease-in-out;
+        }
+        .animate-bounce-short {
+            animation: bounce 0.5s ease-in-out forwards;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 flex flex-col items-center">
+
+    <header class="w-full max-w-4xl flex items-center justify-between mb-8">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Permission Commander</h1>
+                <p class="text-xs text-slate-400">Interactive chmod Visualizer</p>
+            </div>
+        </div>
+        
+        <div class="flex bg-slate-900 p-1 rounded-lg border border-slate-800" id="mode-selector">
+            <button id="mode-learn" onclick="setMode('learn')" class="px-4 py-2 rounded-md text-sm font-medium transition-all bg-indigo-600 text-white shadow-lg">
+                Playground
+            </button>
+            <button id="mode-challenge" onclick="setMode('challenge')" class="px-4 py-2 rounded-md text-sm font-medium transition-all text-slate-400 hover:text-white">
+                Challenges
+            </button>
+        </div>
+    </header>
+
+    <main class="w-full max-w-4xl grid lg:grid-cols-3 gap-8">
+        
+        <!-- Left Column: Context / Challenge -->
+        <div class="lg:col-span-1 space-y-6">
+            <div id="left-column-content" class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                <!-- Content will be injected by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Right Column: Interactive Area -->
+        <div class="lg:col-span-2 space-y-8">
+            
+            <!-- Output Display -->
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="text-xs uppercase tracking-widest text-slate-500 mb-2 font-semibold">Symbolic</div>
+                    <div id="visualizer" class="font-mono text-3xl md:text-5xl flex items-center justify-center gap-1 md:gap-2 overflow-x-auto">
+                        <!-- Symbolic permission string goes here -->
+                    </div>
+                </div>
+
+                <div class="w-full md:w-48 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden">
+                    <div class="text-xs uppercase tracking-widest text-slate-500 mb-2 font-semibold">Octal</div>
+                    <div id="octal-display" class="font-mono text-5xl font-bold text-white tracking-widest">
+                        <!-- Octal code goes here -->
+                    </div>
+                    <div id="chmod-command" class="text-xs text-slate-600 font-mono mt-2"></div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div id="permission-blocks" class="grid md:grid-cols-3 gap-4">
+                <!-- Permission blocks will be injected by JavaScript -->
+            </div>
+
+            <!-- Command Line Preview -->
+            <div class="bg-black/40 rounded-lg p-4 font-mono text-sm text-slate-400 border border-slate-800/50">
+                <div class="flex gap-2">
+                    <span class="text-green-500">user@linux:~$</span>
+                    <span>ls -l</span>
+                </div>
+                <div class="flex gap-4 mt-1 text-slate-200">
+                    <span id="ls-output-perms"></span>
+                    <span>1</span>
+                    <span>user</span>
+                    <span>staff</span>
+                    <span>4096</span>
+                    <span>Dec 5 10:00</span>
+                    <span id="ls-output-filename"></span>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <div id="error-message" class="fixed bottom-4 right-4 bg-red-600 text-white p-3 rounded-lg shadow-xl hidden transition-opacity duration-300"></div>
+
+    <script>
+        // --- Types & Constants (JS equivalent) ---
+        const INITIAL_PERMISSIONS = {
+            owner: { r: false, w: false, x: false },
+            group: { r: false, w: false, x: false },
+            other: { r: false, w: false, x: false },
+        };
+
+        const LEVELS = [
+            {
+                id: 1,
+                title: "The Secret Diary",
+                description: "You have a private diary. You (the Owner) need to read and write to it. No one else should have any access.",
+                hint: "Owner: rw-, Group: ---, Other: ---",
+                target: {
+                    owner: { r: true, w: true, x: false },
+                    group: { r: false, w: false, x: false },
+                    other: { r: false, w: false, x: false },
+                }
+            },
+            {
+                id: 2,
+                title: "Public Web Page",
+                description: "You are hosting a website index.html. You need full control (read/write), but visitors (Group & Others) should only be able to read it.",
+                hint: "Standard web permission is 644.",
+                target: {
+                    owner: { r: true, w: true, x: false },
+                    group: { r: true, w: false, x: false },
+                    other: { r: true, w: false, x: false },
+                }
+            },
+            {
+                id: 3,
+                title: " The Script Executable",
+                description: "You wrote a cool script. Everyone needs to be able to run (execute) and read it, but only you should be able to edit (write) it.",
+                hint: "Everyone needs 'x' and 'r'. Only you get 'w'.",
+                target: {
+                    owner: { r: true, w: true, x: true },
+                    group: { r: true, w: false, x: true },
+                    other: { r: true, w: false, x: true },
+                }
+            },
+            {
+                id: 4,
+                title: "Team Collaboration",
+                description: "A project file for your team. You and your Group need to read and write. Strangers (Others) should see nothing.",
+                hint: "Owner & Group match permissions. Others get dashes.",
+                target: {
+                    owner: { r: true, w: true, x: false },
+                    group: { r: true, w: true, x: false },
+                    other: { r: false, w: false, x: false },
+                }
+            },
+            {
+                id: 5,
+                title: "The Locked Box",
+                description: "A directory that only you can enter or see contents of. (Note: For directories, Execute allows entering).",
+                isDirectory: true,
+                hint: "Read/Write/Execute for Owner only. (700)",
+                target: {
+                    owner: { r: true, w: true, x: true },
+                    group: { r: false, w: false, x: false },
+                    other: { r: false, w: false, x: false },
+                }
+            }
+        ];
+
+        // --- Global State ---
+        let mode = 'learn';
+        let permissions = JSON.parse(JSON.stringify(INITIAL_PERMISSIONS)); // Deep copy
+        let currentLevelIdx = 0;
+        let isDirectory = false;
+        let showSuccess = false;
+
+        // --- Helper Functions ---
+
+        const calculateOctal = (p) => {
+            return (p.r ? 4 : 0) + (p.w ? 2 : 0) + (p.x ? 1 : 0);
+        };
+
+        const getFullOctal = (fp) => {
+            return `${calculateOctal(fp.owner)}${calculateOctal(fp.group)}${calculateOctal(fp.other)}`;
+        };
+
+        const getPermissionCode = (p, type) => {
+            if (type === 'r') return p.r ? 'r' : '-';
+            if (type === 'w') return p.w ? 'w' : '-';
+            if (type === 'x') return p.x ? 'x' : '-';
+        };
+        
+        // --- UI Rendering Functions ---
+
+        const renderVisualizer = () => {
+            const fp = permissions;
+            const isDir = isDirectory;
+
+            const ownerR = fp.owner.r ? "text-green-400" : "text-slate-700";
+            const ownerW = fp.owner.w ? "text-yellow-400" : "text-slate-700";
+            const ownerX = fp.owner.x ? "text-red-400" : "text-slate-700";
+
+            const groupR = fp.group.r ? "text-green-400/80" : "text-slate-700";
+            const groupW = fp.group.w ? "text-yellow-400/80" : "text-slate-700";
+            const groupX = fp.group.x ? "text-red-400/80" : "text-slate-700";
+
+            const otherR = fp.other.r ? "text-green-400/60" : "text-slate-700";
+            const otherW = fp.other.w ? "text-yellow-400/60" : "text-slate-700";
+            const otherX = fp.other.x ? "text-red-400/60" : "text-slate-700";
+
+            document.getElementById('visualizer').innerHTML = `
+                <span class="text-slate-500 mr-2" title="${isDir ? "Directory" : "File"}">${isDir ? 'd' : '-'}</span>
+                
+                <span class="flex">
+                    <span class="${ownerR}">r</span>
+                    <span class="${ownerW}">w</span>
+                    <span class="${ownerX}">x</span>
+                </span>
+
+                <span class="flex mx-2 md:mx-4">
+                    <span class="${groupR}">r</span>
+                    <span class="${groupW}">w</span>
+                    <span class="${groupX}">x</span>
+                </span>
+
+                <span class="flex">
+                    <span class="${otherR}">r</span>
+                    <span class="${otherW}">w</span>
+                    <span class="${otherX}">x</span>
+                </span>
+            `;
+
+            // Update Octal and Command Line Preview
+            const octalCode = getFullOctal(fp);
+            document.getElementById('octal-display').textContent = octalCode;
+            document.getElementById('chmod-command').textContent = `chmod ${octalCode} ${isDir ? 'my_folder' : 'script.sh'}`;
+
+            // Update LS -l output
+            let lsPerms = isDir ? 'd' : '-';
+            lsPerms += getPermissionCode(fp.owner, 'r') + getPermissionCode(fp.owner, 'w') + getPermissionCode(fp.owner, 'x');
+            lsPerms += getPermissionCode(fp.group, 'r') + getPermissionCode(fp.group, 'w') + getPermissionCode(fp.group, 'x');
+            lsPerms += getPermissionCode(fp.other, 'r') + getPermissionCode(fp.other, 'w') + getPermissionCode(fp.other, 'x');
+            
+            document.getElementById('ls-output-perms').textContent = lsPerms;
+            document.getElementById('ls-output-filename').textContent = isDir ? 'my_folder' : 'script.sh';
+            document.getElementById('ls-output-filename').className = isDir ? "text-blue-400 font-bold" : "text-white";
+        };
+
+        const renderToggle = (scope, code, label, val) => {
+            const isActive = permissions[scope][code];
+            return `
+                <button
+                    onclick="togglePermission('${scope}', '${code}')"
+                    class="flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 border
+                    ${isActive 
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' 
+                        : 'bg-slate-700/50 border-slate-600 text-slate-500 hover:bg-slate-700 hover:border-slate-500'}
+                    "
+                >
+                    <span class="text-xl font-mono font-bold mb-1">${code}</span>
+                    <span class="text-[10px] uppercase tracking-wider opacity-80">${label}</span>
+                    <span class="text-[9px] mt-1 font-mono opacity-60">(${val})</span>
+                </button>
+            `;
+        };
+
+        const renderPermissionBlock = (scope) => {
+            const data = permissions[scope];
+            const octal = calculateOctal(data);
+            const title = scope.charAt(0).toUpperCase() + scope.slice(1);
+            
+            let colorClass;
+            let iconSvg;
+            
+            // Map icons and colors
+            if (scope === 'owner') {
+                iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+                colorClass = "border-indigo-500/30";
+            } else if (scope === 'group') {
+                iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`;
+                colorClass = "border-purple-500/30";
+            } else { // other
+                iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a2.5 2.5 0 0 0 1.5 2.5 2.5 2.5 0 0 1 0 3 2.5 2.5 0 0 0-1.5 2.5"></path></svg>`;
+                colorClass = "border-slate-500/30";
+            }
+
+
+            return `
+                <div class="rounded-xl p-4 border-2 ${colorClass} bg-slate-800/50 backdrop-blur-sm flex flex-col gap-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-700">
+                        <div class="flex items-center gap-2">
+                            ${iconSvg}
+                            <span class="font-bold text-slate-200">${title}</span>
+                        </div>
+                        <div class="text-xs font-mono bg-slate-900 px-2 py-1 rounded text-slate-400">
+                            Octal: <span class="text-white font-bold">${octal}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        ${renderToggle(scope, 'r', 'Read', 4)}
+                        ${renderToggle(scope, 'w', 'Write', 2)}
+                        ${renderToggle(scope, 'x', 'Exec', 1)}
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderControls = () => {
+            const container = document.getElementById('permission-blocks');
+            container.innerHTML = `
+                ${renderPermissionBlock('owner')}
+                ${renderPermissionBlock('group')}
+                ${renderPermissionBlock('other')}
+            `;
+        };
+
+        const renderLearnMode = () => {
+            document.getElementById('left-column-content').innerHTML = `
+                <div class="space-y-4 animate-in fade-in slide-in-from-left duration-500">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-400"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        How it works
+                    </h2>
+                    <div class="space-y-3 text-sm text-slate-400">
+                        <p>
+                            <strong class="text-slate-200">Owner:</strong> The user who created the file. Usually you.
+                        </p>
+                        <p>
+                            <strong class="text-slate-200">Group:</strong> A set of users who share permissions (e.g., "developers").
+                        </p>
+                        <p>
+                            <strong class="text-slate-200">Other:</strong> Everyone else in the world.
+                        </p>
+                        <hr class="border-slate-800 my-4"/>
+                        <p>
+                            <strong class="text-green-400">Read (4):</strong> View file contents.
+                        </p>
+                        <p>
+                            <strong class="text-yellow-400">Write (2):</strong> Modify or delete content.
+                        </p>
+                        <p>
+                            <strong class="text-red-400">Execute (1):</strong> Run as a program (or enter directory).
+                        </p>
+                    </div>
+                    
+                    <div class="mt-6 pt-6 border-t border-slate-800">
+                        <label class="flex items-center gap-3 cursor-pointer group">
+                            <div id="dir-mode-switch" class="w-10 h-6 rounded-full p-1 transition-colors ${isDirectory ? 'bg-indigo-600' : 'bg-slate-700'}">
+                                <div class="w-4 h-4 bg-white rounded-full transition-transform ${isDirectory ? 'translate-x-4' : ''}"></div>
+                            </div>
+                            <span class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Directory Mode</span>
+                            <input type="checkbox" class="hidden" ${isDirectory ? 'checked' : ''} onchange="setIsDirectory(this.checked)" />
+                        </label>
+                    </div>
+                </div>
+            `;
+            // Reattach click handler for the switch in case it was clicked outside the checkbox
+             document.getElementById('dir-mode-switch').onclick = () => setIsDirectory(!isDirectory);
+        };
+
+        const renderChallengeMode = () => {
+            const level = LEVELS[currentLevelIdx];
+            const isDirIcon = level.isDirectory 
+                ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><path d="M4 17a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 4h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4z"></path></svg>`
+                : `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
+
+            let actionBlock;
+            if (showSuccess) {
+                actionBlock = `
+                    <div class="bg-green-500/10 border border-green-500/50 p-4 rounded-xl text-center animate-bounce-short">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-green-400 mb-2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <p class="text-green-200 font-bold mb-3">Correct Permissions!</p>
+                        <button 
+                            onclick="nextLevel()"
+                            class="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold transition-colors"
+                        >
+                            ${currentLevelIdx < LEVELS.length - 1 ? 'Next Level' : 'Finish Game!'}
+                        </button>
+                    </div>
+                `;
+            } else {
+                actionBlock = `
+                    <div id="challenge-action-block" class="bg-slate-800 p-4 rounded-xl border border-slate-700/50">
+                        <div class="flex items-center gap-2 text-indigo-300 text-sm font-bold mb-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            Hint
+                        </div>
+                        <p class="text-xs text-slate-500">${level.hint}</p>
+                        <button 
+                            onclick="checkSolution()"
+                            class="w-full mt-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-indigo-900/20"
+                        >
+                            Apply Permissions
+                        </button>
+                    </div>
+                `;
+            }
+
+            document.getElementById('left-column-content').innerHTML = `
+                <div class="animate-in fade-in slide-in-from-left duration-500">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold uppercase tracking-widest text-indigo-400">Level ${currentLevelIdx + 1}/${LEVELS.length}</span>
+                        ${isDirIcon}
+                    </div>
+                    <h2 class="text-xl font-bold mb-2">${level.title}</h2>
+                    <p class="text-slate-400 text-sm leading-relaxed mb-6">
+                        ${level.description}
+                    </p>
+                    ${actionBlock}
+                </div>
+            `;
+        };
+        
+        // --- State Mutators and Game Logic ---
+
+        const showError = (message) => {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = message;
+            errorElement.classList.remove('hidden');
+            errorElement.classList.add('shake-error');
+
+            setTimeout(() => {
+                errorElement.classList.remove('shake-error');
+            }, 500);
+            
+            setTimeout(() => {
+                errorElement.classList.add('hidden');
+            }, 3000);
+        }
+
+        const togglePermission = (scope, type) => {
+            permissions[scope][type] = !permissions[scope][type];
+            showSuccess = false;
+            updateUI();
+        };
+
+        const setIsDirectory = (isDir) => {
+            isDirectory = isDir;
+            updateUI();
+        };
+
+        const setMode = (newMode) => {
+            mode = newMode;
+            document.getElementById('mode-learn').className = `px-4 py-2 rounded-md text-sm font-medium transition-all ${mode === 'learn' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`;
+            document.getElementById('mode-challenge').className = `px-4 py-2 rounded-md text-sm font-medium transition-all ${mode === 'challenge' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`;
+            
+            // Reset state
+            permissions = JSON.parse(JSON.stringify(INITIAL_PERMISSIONS));
+            showSuccess = false;
+            currentLevelIdx = 0;
+            isDirectory = false;
+            
+            if (mode === 'challenge') {
+                isDirectory = LEVELS[0].isDirectory || false;
+            }
+            updateUI();
+        };
+
+        const checkSolution = () => {
+            const target = LEVELS[currentLevelIdx].target;
+            const p = permissions;
+            
+            // Compare all fields
+            const isOwnerMatch = p.owner.r === target.owner.r && p.owner.w === target.owner.w && p.owner.x === target.owner.x;
+            const isGroupMatch = p.group.r === target.group.r && p.group.w === target.group.w && p.group.x === target.group.x;
+            const isOtherMatch = p.other.r === target.other.r && p.other.w === target.other.w && p.other.x === target.other.x;
+
+            if (isOwnerMatch && isGroupMatch && isOtherMatch) {
+                showSuccess = true;
+            } else {
+                showError("Access Denied! Permissions don't match the requirements.");
+                showSuccess = false;
+            }
+            updateUI();
+        };
+
+        const nextLevel = () => {
+            if (currentLevelIdx < LEVELS.length - 1) {
+                currentLevelIdx++;
+                permissions = JSON.parse(JSON.stringify(INITIAL_PERMISSIONS));
+                showSuccess = false;
+                isDirectory = LEVELS[currentLevelIdx].isDirectory || false;
+                updateUI();
+            } else {
+                showError("Congratulations! You are a SysAdmin Master! Game reset.");
+                setMode('learn');
+            }
+        };
+
+        // --- Master Update Function ---
+        const updateUI = () => {
+            renderControls();
+            renderVisualizer();
+            
+            if (mode === 'learn') {
+                renderLearnMode();
+            } else {
+                renderChallengeMode();
+                // Ensure directory mode is set according to the level
+                isDirectory = LEVELS[currentLevelIdx].isDirectory || false;
+            }
+        };
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            updateUI();
+        });
+
+    </script>
+
+</body>
+</html>
